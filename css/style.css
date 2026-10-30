@@ -264,3 +264,5 @@ footer a{color:var(--muted)}
 .crew-main{display:grid;gap:2px;min-width:0}
 .crew-main span{overflow-wrap:anywhere}
 .crew-btns{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;flex-shrink:0}
+.bdg.secret{border:1.5px dashed var(--line);opacity:.8}
+.bdg.secret .medal{background:transparent}

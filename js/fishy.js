@@ -177,6 +177,13 @@ function questBoardHTML(){
 }
 
 /* ---------- badges, level and leaderboard (Catches tab, Fishy mode) ---------- */
+/* Easiest first. Kids see every badge they've earned plus the next 3 easiest; the rest stay secret. */
+const BADGE_EASE = ["rookie", "knot", "flat", "ink", "tide", "dawn", "kind", "rig", "bream5", "rainbow", "measure", "hop", "bream10", "hero", "legend", "captain", "all"];
+function shownBadges(got){
+  const byEase = BADGE_EASE.map(id => BADGES.find(b => b.id === id)).filter(Boolean);
+  const next = new Set(byEase.filter(b => !got.has(b.id)).slice(0, 3).map(b => b.id));
+  return BADGES.filter(b => got.has(b.id) || next.has(b.id)).sort((a, b) => (got.has(b.id) - got.has(a.id)) || BADGE_EASE.indexOf(a.id) - BADGE_EASE.indexOf(b.id));
+}
 function progressHTML(){
   if (!fishy() || !SB) return "";
   if (PROG.mine === null) { loadProgress().then(refreshKeep); return ""; }
@@ -186,8 +193,9 @@ function progressHTML(){
       <span class="bar-track" aria-hidden="true"><i style="width:${pct}%"></i></span>
       <p class="small muted">Catch +10 · Release +5 · New fish +20 · Badge +25 · Guide +15 · Quest +30</p></section>
     <section class="card"><div class="sub"><h2>Badges</h2><span class="small muted num">${got.size} of ${BADGES.length}</span></div>
-      <div class="badge-grid">${BADGES.map(b => { const [have, need] = b.test(m); const on = got.has(b.id);
-        return `<div class="bdg ${on ? "on" : ""}" title="${esc(b.how)}"><span class="medal" aria-hidden="true">${esc(b.icon)}</span><b>${esc(b.name)}</b><span class="small muted">${on ? "Earned!" : esc(b.how) + " (" + Math.min(have, need) + "/" + need + ")"}</span></div>`; }).join("")}</div></section>
+      <div class="badge-grid">${shownBadges(got).map(b => { const [have, need] = b.test(m); const on = got.has(b.id);
+        return `<div class="bdg ${on ? "on" : ""}" title="${esc(b.how)}"><span class="medal" aria-hidden="true">${esc(b.icon)}</span><b>${esc(b.name)}</b><span class="small muted">${on ? "Earned!" : esc(b.how) + " (" + Math.min(have, need) + "/" + need + ")"}</span></div>`; }).join("")}
+        ${(() => { const hid = BADGES.length - shownBadges(got).length; return hid ? `<div class="bdg secret"><span class="medal" aria-hidden="true">?</span><b>${hid} secret badge${hid > 1 ? "s" : ""}</b><span class="small muted">Earn a badge to unlock the next one</span></div>` : ""; })()}</div></section>
     ${leaderboardHTML()}`;
 }
 function leaderboardHTML(){
