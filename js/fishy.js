@@ -5,21 +5,44 @@
 "use strict";
 
 /* ---------- crews ---------- */
-const CREW = {list: null, loading: false, err: ""};
+const CREW = {list: null, members: null, loading: false, err: ""};
 /* Each loader runs once at a time and always ends with a list (empty on failure), so a redraw can't loop. */
 function loadCrews(){
   if (!SB) { CREW.list = CREW.list || []; return Promise.resolve(); }
   if (CREW.p) return CREW.p;
   CREW.loading = true;
   CREW.p = (async () => {
-    try { const r = await SB.from("crews").select("id,name,created_at").order("name").limit(200);
-      CREW.list = r.error ? [] : r.data; CREW.err = r.error ? "Crews aren't set up yet." : ""; }
+    try {
+      const [r, m] = await Promise.all([SB.from("crews").select("id,name,created_at,user_id").order("name").limit(200),
+        SB.from("crew_members").select("id,crew_id,name,user_id").order("created_at").limit(2000)]);
+      CREW.list = r.error ? [] : r.data; CREW.err = r.error ? "Crews aren't set up yet." : "";
+      CREW.members = m.error ? null : m.data;
+      await syncMembership();
+    }
     catch (e) { CREW.list = CREW.list || []; CREW.err = "Couldn't load crews. Check your connection."; }
   })().finally(() => { CREW.loading = false; CREW.p = null; });
   return CREW.p;
 }
 const crewName = id => { const c = (CREW.list || []).find(x => x.id === id); return c ? c.name : null; };
-const myCrewId = () => { const p = activePeople()[0]; return p && p.crewId || null; };
+/* A crew someone else dispersed no longer counts, so its id is dropped from this phone. */
+const myCrewId = () => { const p = activePeople()[0]; if (!p || !p.crewId) return null;
+  if (CREW.list && !CREW.err && !CREW.list.some(c => c.id === p.crewId)) return null; return p.crewId; };
+const membersOf = id => (CREW.members || []).filter(m => m.crew_id === id);
+const iMadeCrew = c => !!MY_ID && c.user_id === MY_ID;
+/* Make sure the shared member list matches the crew this character picked (covers people who joined before the list existed). */
+async function syncMembership(){
+  const p = me0(); if (!p || p.example || !CREW.members || !MY_ID) return;
+  const want = myCrewId(), name = p.name;
+  const mine = CREW.members.filter(m => m.user_id === MY_ID && m.name.toLowerCase() === name.toLowerCase());
+  const names = STORE.people.filter(x => !x.example).map(x => x.name.toLowerCase());
+  const wrong = mine.filter(m => m.crew_id !== want)
+    .concat(CREW.members.filter(m => m.user_id === MY_ID && !names.includes(m.name.toLowerCase())));
+  if (wrong.length) { await SB.from("crew_members").delete().in("id", wrong.map(m => m.id)); CREW.members = CREW.members.filter(m => !wrong.includes(m)); }
+  if (want && !mine.some(m => m.crew_id === want)) {
+    const r = await SB.from("crew_members").insert({crew_id: want, name}).select().single();
+    if (!r.error) CREW.members.push(r.data);
+  }
+}
 
 /* ---------- my catches (this character, all time) and crew catches (this year) ---------- */
 const PROG = {mine: null, crewYear: null, at: 0, key: ""};
@@ -187,27 +210,51 @@ function crewCardHTML(){
   if (!SB) return "";
   if (CREW.list === null) { loadCrews().then(refreshKeep); return `<section class="card"><h2>Crew</h2><p class="small muted">Loading…</p></section>`; }
   const cur = myCrewId(), p = me0();
+  const row = c => { const ms = membersOf(c.id), inIt = c.id === cur;
+    return `<li class="crew-row${inIt ? " on" : ""}">
+      <div class="crew-main"><b>${esc(c.name)}</b>
+        <span class="small muted">${CREW.members === null ? "" : ms.length ? ms.map(m => esc(m.name)).join(", ") : "No one yet"}</span></div>
+      <div class="crew-btns">
+        ${inIt ? `<button class="btn ghost small" type="button" data-crew="">Leave</button>` : `<button class="btn small" type="button" data-crew="${c.id}">Join</button>`}
+        ${iMadeCrew(c) ? `<button class="btn small danger" type="button" data-disperse="${c.id}">Disperse</button>` : ""}
+      </div></li>`; };
+  const list = [...CREW.list].sort((a, b) => (b.id === cur) - (a.id === cur));
   return `<section class="card"><div class="sub"><h2>${T("Crew", "Your fishing crew")}</h2>${cur ? `<span class="badge info">${esc(crewName(cur) || "Crew")}</span>` : ""}</div>
-    <p class="small muted">${p && !p.example ? esc(p.name) + "'s crew. " : ""}Anyone can join a crew. Catches are shared with the crew${fishy() ? " and count towards crew quests and the leaderboard" : ""}.</p>
+    <p class="small muted">${p && !p.example ? esc(p.name) + "'s crew. " : ""}Anyone can join a crew. Catches are shared with the crew${fishy() ? " and count towards crew quests and the leaderboard" : ""}. Only the person who made a crew can disperse it.</p>
     ${CREW.err ? `<p class="err">${esc(CREW.err)}</p>` : ""}
-    <div class="who">${CREW.list.map(c => `<button class="chip" aria-pressed="${c.id === cur}" data-crew="${c.id}">${esc(c.name)}</button>`).join("")}${cur ? `<button class="chip" data-crew="">Leave crew</button>` : ""}</div>
+    ${list.length ? `<ul class="crew-list">${list.map(row).join("")}</ul>` : `<p class="small muted">No crews yet. Make the first one.</p>`}
     <form id="crewForm" class="search"><label for="crewName" class="label" style="position:absolute;left:-9999px">New crew name</label><input id="crewName" type="text" maxlength="30" placeholder="New crew name, e.g. Harbour Hunters"><button class="btn" type="submit">Create</button></form>
     <p class="err" id="crewErr" hidden></p></section>`;
 }
 function wireCrew(el){
-  el.querySelectorAll("[data-crew]").forEach(b => b.onclick = () => {
-    const p = me0(); if (!p) return; if (p.example) { const e = el.querySelector("#crewErr"); e.hidden = false; e.textContent = "Set up your character first (Edit above), then join a crew."; return; }
-    p.crewId = b.dataset.crew || null; save(); PROG.at = 0; loadProgress(true).then(refreshKeep); refreshKeep();
+  const err = el.querySelector("#crewErr");
+  const say = t => { if (err) { err.hidden = false; err.textContent = t; } };
+  el.querySelectorAll("[data-crew]").forEach(b => b.onclick = async () => {
+    const p = me0(); if (!p) return; if (p.example) return say("Set up your character first (Edit above), then join a crew.");
+    b.disabled = true;
+    try { await ensureUser(); } catch (e) {}
+    p.crewId = b.dataset.crew || null; save();
+    try { await syncMembership(); } catch (e) { console.warn(e); }
+    PROG.at = 0; loadProgress(true).then(refreshKeep); refreshKeep();
+  });
+  el.querySelectorAll("[data-disperse]").forEach(b => b.onclick = async () => {
+    const c = (CREW.list || []).find(x => x.id === b.dataset.disperse); if (!c) return;
+    if (!b.dataset.sure) { b.dataset.sure = "1"; b.textContent = "Tap again to disperse"; setTimeout(() => { if (b.isConnected) { delete b.dataset.sure; b.textContent = "Disperse"; } }, 4000); return; }
+    b.disabled = true; b.textContent = "Dispersing…";
+    const r = await SB.from("crews").delete().eq("id", c.id).select();
+    if (r.error || !r.data || !r.data.length) { b.disabled = false; b.textContent = "Disperse"; delete b.dataset.sure; return say("Couldn't disperse the crew. Only the person who made it can, on the phone they made it on."); }
+    STORE.people.forEach(x => { if (x.crewId === c.id) x.crewId = null; }); save();
+    await loadCrews(); PROG.at = 0; loadProgress(true).then(refreshKeep); refreshKeep();
   });
   const f = el.querySelector("#crewForm"); if (!f) return;
   f.onsubmit = async e => {
-    e.preventDefault(); const inp = f.querySelector("#crewName"), err = el.querySelector("#crewErr"), name = inp.value.trim(); err.hidden = true;
-    if (!name) { err.hidden = false; err.textContent = "Type a crew name first"; inp.focus(); return; }
-    if ((CREW.list || []).some(c => c.name.toLowerCase() === name.toLowerCase())) { err.hidden = false; err.textContent = "That crew already exists. Tap its name to join."; return; }
-    if (me0().example) { err.hidden = false; err.textContent = "Set up your character first (Edit above), then create a crew."; return; }
+    e.preventDefault(); const inp = f.querySelector("#crewName"), name = inp.value.trim(); err.hidden = true;
+    if (!name) { say("Type a crew name first"); inp.focus(); return; }
+    if ((CREW.list || []).some(c => c.name.toLowerCase() === name.toLowerCase())) return say("That crew already exists. Tap Join next to it.");
+    if (me0().example) return say("Set up your character first (Edit above), then create a crew.");
     try { await ensureUser(); const r = await SB.from("crews").insert({name}).select().single(); if (r.error) throw r.error;
       me0().crewId = r.data.id; save(); await loadCrews(); PROG.at = 0; refreshKeep(); }
-    catch (x) { console.error(x); err.hidden = false; err.textContent = "Couldn't create the crew. Check your connection and try again."; }
+    catch (x) { console.error(x); say("Couldn't create the crew. Check your connection and try again."); }
   };
 }
 
