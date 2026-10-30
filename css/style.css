@@ -220,3 +220,6 @@ footer a{color:var(--muted)}
 .photo-pick:focus-within{outline:3px solid var(--sea);outline-offset:2px}
 .sel{border:var(--border) solid var(--line);background:var(--surface);border-radius:12px;padding:10px 12px;min-height:44px;width:100%}
 .chip:disabled{opacity:.45;cursor:default}
+.photo-btns label{position:relative;display:inline-flex;align-items:center;cursor:pointer}
+.photo-btns input{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}
+.photo-btns label:focus-within{outline:3px solid var(--sea);outline-offset:2px}

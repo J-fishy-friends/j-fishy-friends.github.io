@@ -149,7 +149,12 @@ function renderNewCatch(){
   <form class="card form" id="catchForm" novalidate>
     <h2>${T("Log a catch", "New card!")}</h2>
     <div class="field"><span class="label">Photo</span>
-      <label class="photo-pick">${d.preview ? `<img src="${d.preview}" alt="Your photo">` : `<span>${T("Add a photo", "Snap your fish!")}</span>`}<input type="file" id="cPhoto" accept="image/*" capture="environment"></label>
+      ${d.preview ? `<div class="photo-pick"><img src="${d.preview}" alt="Your photo"></div>` : ""}
+      <div class="row-btns photo-btns">
+        <label class="btn ghost small">${T("Choose from photos", "Pick a photo")}<input type="file" id="cPhoto" accept="image/*"></label>
+        <label class="btn ghost small">${T("Take a photo", "Snap your fish!")}<input type="file" id="cCamera" accept="image/*" capture="environment"></label>
+        ${d.preview ? `<button type="button" class="btn danger small" id="cNoPhoto">Remove photo</button>` : ""}
+      </div>
       ${d.photoErr ? `<span class="err">${esc(d.photoErr)}</span>` : `<span class="small muted">Optional. It's shrunk to save space and shared with friends.</span>`}</div>
     <div class="field"><span class="label">${T("Which fish?", "What did you catch?")}</span>
       <div class="fish-pick">${SPECIES_KEYS.map(sp => `<button type="button" class="fp" aria-pressed="${d.fish === sp}" data-fp="${sp}">${fishIcon(sp, 44)}<span>${SPECIES[sp].name}</span></button>`).join("")}</div>
@@ -228,13 +233,16 @@ function wireCatches(el){
   f.querySelectorAll("[data-fight]").forEach(b => b.onclick = () => { d.fight = +b.dataset.fight; rerender(); });
   f.querySelector("#cLen").onchange = () => { keepFields(); if (d.fish) { const rc = ruleCheck(d.fish, +d.length || 0, d.spot); if (d.kept && !rc.canKeep && rc.status !== "unsure") d.kept = false; } rerender(); };
   f.querySelector("#cSpot").onchange = rerender;
-  f.querySelector("#cPhoto").onchange = async e => {
+  const noPhoto = f.querySelector("#cNoPhoto"); if (noPhoto) noPhoto.onclick = () => { if (d.preview) URL.revokeObjectURL(d.preview); d.preview = null; d.blob = null; rerender(); };
+  const onPhoto = async e => {
     const file = e.target.files && e.target.files[0]; if (!file) return;
     keepFields(); d.photoErr = "";
     try { d.blob = await shrinkPhoto(file); if (d.preview) URL.revokeObjectURL(d.preview); d.preview = URL.createObjectURL(d.blob); }
     catch (x) { d.blob = null; d.photoErr = "That photo couldn't be read. Try a JPEG or PNG photo."; }
     rerender();
   };
+  f.querySelector("#cPhoto").onchange = onPhoto;
+  f.querySelector("#cCamera").onchange = onPhoto;
   f.onsubmit = async e => {
     e.preventDefault(); keepFields();
     const err = f.querySelector("#saveErr"); err.hidden = true;
