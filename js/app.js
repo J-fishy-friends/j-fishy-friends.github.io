@@ -301,7 +301,7 @@ function fishHTML(i,spot){
   const others=fishRows(i,spot,SPECIES_KEYS.filter(k=>!list.includes(k))).filter(o=>o.w&&o.w.v>=66).sort((x,y)=>y.w.v-x.w.v).slice(0,2);
   const row=o=>`<div class="fish-row"><span class="name">${SPECIES[o.sp].name}</span>${o.w?pill(o.w.v,o.w):`<span class="pill poor">${T("No free time","No free time")}</span>`}
     <span class="num muted">${o.w?"Best "+rangeTxt(o.w)+" · "+o.w.reasons.slice(0,2).join(", ").toLowerCase():"Outside your free time"}</span><span></span>
-    <span class="tip">${esc(fishy()?SPECIES[o.sp].fishyTip:SPECIES[o.sp].tip)}</span></div>`;
+    <span class="tip">${esc(fishy()?SPECIES[o.sp].fishyTip:SPECIES[o.sp].tip)} <a href="#guide-${guideFor(o.sp)}">${T("How to rig it","Show me how")} ›</a></span></div>`;
   return`<section class="card"><div class="sub"><h2>${T("Your fish here","Your fish to find")}</h2><span class="small muted">${i===0?"Today":fDay.format(dayStart(i))}</span></div><div class="fish">${rows.map(row).join("")}</div></section>`
     +(others.length?`<section class="card"><div class="sub"><h2>${T("Also biting","Bonus fish!")}</h2><span class="small muted">${T("Suggested for you","Try these too")}</span></div><div class="fish">${others.map(row).join("")}</div></section>`:"");
 }
@@ -458,6 +458,7 @@ function renderMe(){
   return`<section class="card"><h2>${T("Who's fishing","Your crew")}</h2><p class="muted small">Each person has a character with their free time, favourite fish and look. Tap the names at the top to choose who's going, and the app finds times that suit everyone. Characters are saved on this phone.</p>
   <div class="people">${STORE.people.map(p=>`<div class="person"><span class="nm"><span class="dot" style="background:${esc(p.color)};width:14px;height:14px"></span>${esc(p.name)}${p.example?' <span class="small muted">(example)</span>':""}${p.tone==="fishy"?' <span class="badge info">Fishy mode</span>':""}</span><button class="btn ghost small" data-edit="${esc(p.id)}">Edit</button></div>`).join("")}</div>
   <div class="row-btns"><button class="btn" id="add">Add a character</button></div></section>
+  <section class="card"><div class="sub"><h2>${T("Rig and bait guides","How-to guides")}</h2><a href="#guides" class="small">See all ›</a></div><div class="fish">${(window.GUIDES||[]).map(g=>`<div class="fish-row"><a href="#guide-${g.id}" class="name">${esc(g.title)}</a><a class="small" href="${g.pdf}" target="_blank" rel="noopener">PDF</a></div>`).join("")}</div></section>
   <section class="card"><h2>About the data</h2><p class="small muted">Tides are calculated from tide-gauge constants and match the Bureau of Meteorology tables for Fort Denison to within a few minutes. Weather and water temperature come live from Open-Meteo every time you open the app. Shared pins and comments are ${SB?"switched on":"not set up"}.</p></section>`;
 }
 function editHTML(p){
@@ -497,19 +498,19 @@ function showWhy(spot,sp,t,opener){
 }
 
 /* ---------- render & wiring ---------- */
-const VIEWS=["today","next-3-days","week","spots","catches","me"];
-function currentView(){const v=(location.hash||"#today").slice(1);return VIEWS.includes(v)?v:"today"}
+const VIEWS=["today","next-3-days","week","spots","catches","guides","me"];
+function currentView(){const v0=(location.hash||"#today").slice(1);const v=v0.startsWith("guide-")?"guides":v0;return VIEWS.includes(v)?v:"today"}
 function render(){
   document.documentElement.classList.toggle("fishy",fishy());
   const view=currentView();
   document.querySelectorAll("nav.tabs a").forEach(a=>a.setAttribute("aria-current",a.dataset.v===(view==="next-3-days"?"week":view)?"page":"false"));
   $("#mark").textContent=fishy()?"Fishy Finds":"Fishy Friends";
-  $("#title").textContent=view==="today"?(selDay===0?T("Today","Today's quest"):fDayLong.format(dayStart(selDay))):view==="next-3-days"?"Next 3 days":view==="week"?"This week":view==="spots"?(detail?SPOTS[detail].name:"Spots"):view==="catches"?T("Catches","Fish cards"):T("Characters","Your crew");
+  $("#title").textContent=view==="today"?(selDay===0?T("Today","Today's quest"):fDayLong.format(dayStart(selDay))):view==="next-3-days"?"Next 3 days":view==="week"?"This week":view==="spots"?(detail?SPOTS[detail].name:"Spots"):view==="catches"?T("Catches","Fish cards"):view==="guides"?T("Rig and bait guides","How-to guides"):T("Characters","Your crew");
   document.title=fishy()?"Fishy Finds · Fishy Friends":"Fishy Friends";
   renderWho();
   if(MAP){MAP.remove();MAP=null}
   const el=$("#view");
-  el.innerHTML=view==="today"?renderToday():view==="next-3-days"?renderDays(3):view==="week"?renderDays(7):view==="spots"?renderSpots():view==="catches"?renderCatches():renderMe();
+  el.innerHTML=view==="today"?renderToday():view==="next-3-days"?renderDays(3):view==="week"?renderDays(7):view==="spots"?renderSpots():view==="catches"?renderCatches():view==="guides"?renderGuides():renderMe();
   wire(el,view);
   $("#foot").innerHTML=`<p>Tide times are calculated from tide-gauge data (TICON-4 via <a href="https://neaps.js.org/" target="_blank" rel="noopener">Neaps</a>) and checked against the Bureau of Meteorology. Heights are approximate. Not for navigation.</p>
     <p>Weather, water temperature and place search from <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a>. Maps © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>. Seafood advice: <a href="https://www.health.nsw.gov.au/environment/factsheets/Pages/dioxins.aspx" target="_blank" rel="noopener">NSW Health</a>.</p>
