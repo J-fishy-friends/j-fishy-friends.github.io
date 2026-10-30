@@ -51,13 +51,14 @@ const photoUrl = p => p && SB ? SB.storage.from("catch-photos").getPublicUrl(p).
 
 /* ---------- data ---------- */
 const CATCH = {list: null, cheers: [], loading: false, err: "", mode: "feed", filter: "all", openId: null, draft: null, saving: false, chan: null};
-async function loadCatches(){
+async function loadCatchesNow(){
   if (!SB) { CATCH.list = []; return; }
   CATCH.loading = true;
-  const [a, b] = await Promise.all([
+  let a, b;
+  try { [a, b] = await Promise.all([
     SB.from("catches").select("*").order("caught_at", {ascending: false}).limit(100),
     SB.from("cheers").select("catch_id,user_id").limit(2000)
-  ]);
+  ]); } catch (e) { a = {error: e}; b = {}; }
   CATCH.loading = false;
   if (a.error) { CATCH.err = "Couldn't load catches. Check your connection."; CATCH.list = CATCH.list || []; return; }
   CATCH.err = ""; CATCH.list = a.data || []; CATCH.cheers = b.data || [];
@@ -67,6 +68,11 @@ async function loadCatches(){
       .on("postgres_changes", {event: "*", schema: "public", table: "cheers"}, () => loadCatches().then(refreshCatches))
       .subscribe();
   }
+}
+function loadCatches(){
+  if (CATCH.p) return CATCH.p;
+  CATCH.p = loadCatchesNow().catch(e => { CATCH.list = CATCH.list || []; }).finally(() => { CATCH.p = null; });
+  return CATCH.p;
 }
 function refreshCatches(){ if (currentView() === "catches" && CATCH.mode !== "new") refreshKeep(); }
 const cheersFor = id => CATCH.cheers.filter(c => c.catch_id === id);

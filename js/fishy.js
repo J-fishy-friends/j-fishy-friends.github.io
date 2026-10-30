@@ -6,10 +6,17 @@
 
 /* ---------- crews ---------- */
 const CREW = {list: null, loading: false, err: ""};
-async function loadCrews(){
-  if (!SB || CREW.loading) return; CREW.loading = true;
-  const r = await SB.from("crews").select("id,name,created_at").order("name").limit(200);
-  CREW.loading = false; CREW.list = r.error ? [] : r.data; CREW.err = r.error ? "Crews aren't set up yet." : "";
+/* Each loader runs once at a time and always ends with a list (empty on failure), so a redraw can't loop. */
+function loadCrews(){
+  if (!SB) { CREW.list = CREW.list || []; return Promise.resolve(); }
+  if (CREW.p) return CREW.p;
+  CREW.loading = true;
+  CREW.p = (async () => {
+    try { const r = await SB.from("crews").select("id,name,created_at").order("name").limit(200);
+      CREW.list = r.error ? [] : r.data; CREW.err = r.error ? "Crews aren't set up yet." : ""; }
+    catch (e) { CREW.list = CREW.list || []; CREW.err = "Couldn't load crews. Check your connection."; }
+  })().finally(() => { CREW.loading = false; CREW.p = null; });
+  return CREW.p;
 }
 const crewName = id => { const c = (CREW.list || []).find(x => x.id === id); return c ? c.name : null; };
 const myCrewId = () => { const p = activePeople()[0]; return p && p.crewId || null; };
@@ -17,18 +24,25 @@ const myCrewId = () => { const p = activePeople()[0]; return p && p.crewId || nu
 /* ---------- my catches (this character, all time) and crew catches (this year) ---------- */
 const PROG = {mine: null, crewYear: null, at: 0, key: ""};
 function playerKey(){ const p = activePeople()[0]; return (MY_ID || "") + "|" + (p ? p.name : ""); }
-async function loadProgress(force){
-  if (!SB) return;
+function loadProgress(force){
+  if (!SB) { PROG.mine = PROG.mine || []; PROG.crewYear = PROG.crewYear || []; return Promise.resolve(); }
+  if (PROG.p) return PROG.p;
   const key = playerKey() + "|" + (myCrewId() || "");
-  if (!force && PROG.key === key && Date.now() - PROG.at < 60000) return;
-  try { await ensureUser(); } catch (e) { return; }
-  const me = myCharacter();
-  let q = SB.from("catches").select("id,fish,length_cm,kept,spot,spot_name,tide,caught_at,author,user_id,crew_id").eq("user_id", MY_ID).order("caught_at").limit(2000);
-  if (me) q = q.eq("author", me);
-  const yearStart = new Date(Date.UTC(P(new Date()).y, 0, 1) - 11 * HOUR).toISOString();
-  const crew = myCrewId();
-  const [a, b] = await Promise.all([q, crew ? SB.from("catches").select("id,fish,kept,caught_at,author,user_id,length_cm").eq("crew_id", crew).gte("caught_at", yearStart).limit(5000) : Promise.resolve({data: []})]);
-  PROG.mine = a.data || []; PROG.crewYear = b.data || []; PROG.at = Date.now(); PROG.key = key;
+  if (!force && PROG.key === key && Date.now() - PROG.at < 60000) return Promise.resolve();
+  PROG.p = (async () => {
+    try {
+      await ensureUser();
+      const me = myCharacter();
+      let q = SB.from("catches").select("id,fish,length_cm,kept,spot,spot_name,tide,caught_at,author,user_id,crew_id").eq("user_id", MY_ID).order("caught_at").limit(2000);
+      if (me) q = q.eq("author", me);
+      const yearStart = new Date(Date.UTC(P(new Date()).y, 0, 1) - 11 * HOUR).toISOString();
+      const crew = myCrewId();
+      const [a, b] = await Promise.all([q, crew ? SB.from("catches").select("id,fish,kept,caught_at,author,user_id,length_cm").eq("crew_id", crew).gte("caught_at", yearStart).limit(5000) : Promise.resolve({data: []})]);
+      PROG.mine = a.data || []; PROG.crewYear = b.data || [];
+    } catch (e) { console.warn("progress", e); PROG.mine = PROG.mine || []; PROG.crewYear = PROG.crewYear || []; }
+    PROG.at = Date.now(); PROG.key = key;
+  })().finally(() => { PROG.p = null; });
+  return PROG.p;
 }
 
 /* ---------- skills (finished guides) and picked quests: saved on this phone per character ---------- */
