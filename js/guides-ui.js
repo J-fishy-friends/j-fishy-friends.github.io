@@ -46,7 +46,8 @@ function renderGuide(g){
     <div class="badges">${g.for.map(f => `<span class="badge info">${SPECIES[f] ? SPECIES[f].name : esc(f)}</span>`).join("")}</div>
   </section>
   <section class="card"><h3>You need</h3><p>${esc(g.you_need)}</p>
-    <h3>Steps</h3><ol class="steps">${g.steps.map(s => `<li>${esc(s)}</li>`).join("")}</ol>
+    <h3>Steps</h3><p class="small muted">Tick each step as you do it.</p><ol class="steps check">${g.steps.map((s, i) => `<li><label><input type="checkbox" data-step="${i}"> ${esc(s)}</label></li>`).join("")}</ol>
+    ${skills()[g.id] ? `<div class="rulebox keep"><b>${T("Done", "You did it!")}</b><span>${T("You finished this guide.", "Guide finished: +15 XP")}</span></div>` : `<button class="btn" type="button" data-skill="${g.id}" disabled>${T("I did it", "I did it! +15 XP")}</button>`}
     <div class="rulebox info"><b>${T("Kid tip", "Fishy tip")}</b><span>${esc(g.kid_tip)}</span></div>
     <div class="rulebox rel"><b>Stay safe</b><span>${esc(g.safety)}</span></div>
   </section>
@@ -58,4 +59,12 @@ function renderGuide(g){
     </div>
     ${g.video ? `<p class="small muted">${esc(g.video.label)}</p>` : ""}
   </section>`;
+}
+
+function wireGuide(el){
+  const btn = el.querySelector("[data-skill]"); if (!btn) return;
+  const boxes = [...el.querySelectorAll("[data-step]")];
+  const upd = () => { btn.disabled = !boxes.every(b => b.checked); };
+  boxes.forEach(b => b.onchange = upd);
+  btn.onclick = () => { if (btn.disabled) return; markSkill(btn.dataset.skill); refreshKeep(); };
 }

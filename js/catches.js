@@ -82,9 +82,11 @@ function renderCatches(){
   const me = myCharacter();
   let list = CATCH.list;
   if (CATCH.filter === "mine") list = list.filter(c => c.user_id === MY_ID && (!me || c.author === me));
+  if (CATCH.filter === "crew") list = list.filter(c => c.crew_id && c.crew_id === myCrewId());
   return `<div class="row-btns"><button class="btn" id="newCatch" style="flex:1">${T("Log a catch", "I caught a fish!")}</button></div>
     ${collectionHTML()}
-    <div class="seg" role="group" aria-label="Show"><button class="chip" aria-pressed="${CATCH.filter === "all"}" data-cf="all">Everyone</button><button class="chip" aria-pressed="${CATCH.filter === "mine"}" data-cf="mine">${me ? esc(me) + "'s" : "Mine"}</button></div>
+    ${progressHTML()}
+    <div class="seg" role="group" aria-label="Show"><button class="chip" aria-pressed="${CATCH.filter === "all"}" data-cf="all">Everyone</button>${myCrewId() ? `<button class="chip" aria-pressed="${CATCH.filter === "crew"}" data-cf="crew">${esc(crewName(myCrewId()) || "My crew")}</button>` : ""}<button class="chip" aria-pressed="${CATCH.filter === "mine"}" data-cf="mine">${me ? esc(me) + "'s" : "Mine"}</button></div>
     ${CATCH.err ? `<p class="err">${esc(CATCH.err)}</p>` : ""}
     ${list.length ? `<div class="feed">${list.map(miniCard).join("")}</div>` : `<section class="card"><p class="muted">${T("No catches yet. Log the first one!", "No cards yet. Go catch one!")}</p></section>`}`;
 }
@@ -263,10 +265,14 @@ function wireCatches(el){
       const t = parseWhen(d.when);
       const row = {fish: d.fish, length_cm: len, fight: d.fight || null, kept: !!d.kept, spot: d.spot || null, spot_name: d.spot ? SPOTS[d.spot].name : "Somewhere else",
         bait: d.bait.trim() || null, note: d.note.trim() || null, tide: tideWord(d.spot, t) || null, photo_path, author: authorName(), caught_at: new Date(t).toISOString()};
-      const r = await SB.from("catches").insert(row).select().single();
+      const before = fishy() ? await snapshotProgress().catch(() => null) : null;
+      if (myCrewId()) row.crew_id = myCrewId();
+      let r = await SB.from("catches").insert(row).select().single();
+      if (r.error && row.crew_id && /crew_id/.test(r.error.message || "")) { delete row.crew_id; r = await SB.from("catches").insert(row).select().single(); }
       if (r.error) throw r.error;
       CATCH.saving = false; if (d.preview) URL.revokeObjectURL(d.preview);
       CATCH.draft = null; await loadCatches(); CATCH.mode = "card"; CATCH.openId = r.data.id; render(); window.scrollTo(0, 0);
+      celebrate(before, row.fish).catch(e => console.error(e));
     } catch (x) {
       console.error(x); CATCH.saving = false; rerender();
       const e2 = document.getElementById("saveErr"); if (e2) { e2.hidden = false; e2.textContent = "Couldn't save the catch. Check your connection and try again."; }

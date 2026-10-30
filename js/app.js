@@ -310,7 +310,7 @@ function renderToday(){
   const list=mySpots();if(!selSpot||!list.includes(selSpot))selSpot=list[0];const sp=selSpot;
   const dayBtns=[0,1,2,3,4,5,6].map(i=>`<button class="chip" aria-pressed="${i===selDay}" data-day="${i}">${i===0?"Today":i===1?"Tomorrow":fDay.format(dayStart(i))}</button>`).join("");
   const st=window.SAFETY[SPOTS[sp].safety||"none"];
-  return heroHTML()+`
+  return heroHTML()+questBoardHTML()+`
   <div class="seg" role="group" aria-label="Spot">${list.map(k=>`<button class="chip" aria-pressed="${k===sp}" data-spot="${k}">${esc(SPOTS[k].name)}</button>`).join("")}<a class="chip" href="#spots" style="text-decoration:none;color:var(--muted)">+ Add</a></div>
   <section class="card">
     <div class="sub"><h2>${esc(SPOTS[sp].name)}</h2>${safetyBadge(sp)}</div>
@@ -456,8 +456,9 @@ function refreshDetail(){if(detail&&currentView()==="spots"){const y=window.scro
 function renderMe(){
   if(editing)return editHTML(editing);
   return`<section class="card"><h2>${T("Who's fishing","Your crew")}</h2><p class="muted small">Each person has a character with their free time, favourite fish and look. Tap the names at the top to choose who's going, and the app finds times that suit everyone. Characters are saved on this phone.</p>
-  <div class="people">${STORE.people.map(p=>`<div class="person"><span class="nm"><span class="dot" style="background:${esc(p.color)};width:14px;height:14px"></span>${esc(p.name)}${p.example?' <span class="small muted">(example)</span>':""}${p.tone==="fishy"?' <span class="badge info">Fishy mode</span>':""}</span><button class="btn ghost small" data-edit="${esc(p.id)}">Edit</button></div>`).join("")}</div>
+  <div class="people">${STORE.people.map(p=>`<div class="person"><span class="nm"><span class="dot" style="background:${esc(p.color)};width:14px;height:14px"></span>${esc(p.name)}${p.example?' <span class="small muted">(example)</span>':""}${p.tone==="fishy"?' <span class="badge info">Fishy mode</span>':""}${p.crewId&&crewName(p.crewId)?' <span class="badge info">'+esc(crewName(p.crewId))+'</span>':""}</span><button class="btn ghost small" data-edit="${esc(p.id)}">Edit</button></div>`).join("")}</div>
   <div class="row-btns"><button class="btn" id="add">Add a character</button></div></section>
+  ${crewCardHTML()}
   <section class="card"><div class="sub"><h2>${T("Rig and bait guides","How-to guides")}</h2><a href="#guides" class="small">See all ›</a></div><div class="fish">${(window.GUIDES||[]).map(g=>`<div class="fish-row"><a href="#guide-${g.id}" class="name">${esc(g.title)}</a><a class="small" href="${g.pdf}" target="_blank" rel="noopener">PDF</a></div>`).join("")}</div></section>
   <section class="card"><h2>About the data</h2><p class="small muted">Tides are calculated from tide-gauge constants and match the Bureau of Meteorology tables for Fort Denison to within a few minutes. Weather and water temperature come live from Open-Meteo every time you open the app. Shared pins and comments are ${SB?"switched on":"not set up"}.</p></section>`;
 }
@@ -538,6 +539,8 @@ function wire(el,view){
   if(view==="spots"&&detail)wireDetail(el,detail);
   if(view==="me")wireMe(el);
   if(view==="catches")wireCatches(el);
+  wireQuests(el);
+  if(view==="guides")wireGuide(el);
 }
 function refreshKeep(){const y=window.scrollY;render();window.scrollTo(0,y)}
 function openDetail(k){detail=k;addingPin=null;if(location.hash!=="#spots")location.hash="#spots";else render();ensureWeather([k]);loadShared(k).then(refreshDetail).catch(()=>{});window.scrollTo(0,0)}
@@ -570,6 +573,7 @@ function wireDetail(el,k){
     b.disabled=true;const r=await SB.from("comments").delete().eq("id",b.dataset.delcm);if(!r.error){await loadShared(k);refreshKeep()}});
 }
 function wireMe(el){
+  wireCrew(el);
   const add=el.querySelector("#add");
   if(add)add.onclick=()=>{editing={id:"p"+Date.now().toString(36),name:"",color:COLORS[STORE.people.length%COLORS.length],free:defaultFree(),spotTypes:[],targets:[],method:"bait",tone:"calm",isNew:true};render()};
   el.querySelectorAll("[data-edit]").forEach(b=>b.onclick=()=>{editing=JSON.parse(JSON.stringify(STORE.people.find(x=>x.id===b.dataset.edit)));confirmDel=null;render()});
@@ -584,7 +588,8 @@ function wireMe(el){
   f.querySelectorAll("[data-tone]").forEach(b=>b.onclick=()=>{editing.tone=b.dataset.tone;f.querySelectorAll("[data-tone]").forEach(x=>x.setAttribute("aria-pressed",x.dataset.tone===editing.tone))});
   f.querySelectorAll("[data-col]").forEach(b=>b.onclick=()=>{editing.color=b.dataset.col;f.querySelectorAll("[data-col]").forEach(x=>x.setAttribute("aria-pressed",x.dataset.col===editing.color))});
   f.onsubmit=e=>{e.preventDefault();const name=nm.value.trim();if(!name){f.querySelector("#nmErr").hidden=false;nm.focus();return}
-    const p={id:editing.example?"p"+Date.now().toString(36):editing.id,name,color:editing.color,free:editing.free,spotTypes:editing.spotTypes,targets:editing.targets.length?editing.targets:["bream"],method:editing.method,tone:editing.tone||"calm"};
+    const keep=Object.assign({},editing);["example","isNew","nameDraft"].forEach(k=>delete keep[k]);
+    const p={...keep,id:editing.example?"p"+Date.now().toString(36):editing.id,name,color:editing.color,free:editing.free,spotTypes:editing.spotTypes,targets:editing.targets.length?editing.targets:["bream"],method:editing.method,tone:editing.tone||"calm"};
     const i=STORE.people.findIndex(x=>x.id===editing.id);if(i>=0)STORE.people[i]=p;else STORE.people.push(p);
     if(editing.example)STORE.active=STORE.active.map(a=>a===editing.id?p.id:a);
     if(editing.isNew)STORE.active=[...STORE.active,p.id];
@@ -597,6 +602,7 @@ function wireMe(el){
 /* ---------- start ---------- */
 function ensureWeather(keys){const zones=[...new Set(keys.map(wxKey))];zones.forEach(z=>{if(!WX[z])loadWeather(z).then(()=>refreshKeep())})}
 window.addEventListener("hashchange",()=>{editing=null;if(currentView()!=="spots"){detail=null;addingPin=null}if(currentView()!=="catches"&&CATCH.mode!=="new"){CATCH.mode="feed";CATCH.openId=null}render();window.scrollTo(0,0)});
+if(SB)loadCrews().then(()=>{if(fishy())loadProgress().then(refreshKeep);else refreshKeep()});
 render();
 ensureWeather([...mySpots(),...Object.keys(window.CURATED_SPOTS)]);
 setInterval(()=>{const d=dayKey(NOW);setClock();if(dayKey(NOW)!==d){for(const k in TIDES)delete TIDES[k]}if(!document.querySelector(".sheet-bg")&&!editing&&!addingPin&&CATCH.mode!=="new"&&document.activeElement.tagName!=="INPUT")refreshKeep()},5*60000);
