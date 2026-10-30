@@ -9,6 +9,7 @@ A free Sydney fishing planner for rookies and kids. It finds the best bite times
 - **Weather, water temperature and place search** come live from [Open-Meteo](https://open-meteo.com/) (no key needed).
 - **Maps** use [OpenStreetMap](https://www.openstreetmap.org/copyright) via Leaflet.
 - **Shared pins and comments** use Supabase (free plan). Settings in `js/config.js`; database setup in `supabase/setup.sql`.
+- **Catch cards** (version 3): log a catch with a photo, get a collectible card with rarity, NSW size and bag limits, cheers and comments. Database setup in `supabase/setup-v3-catches.sql`.
 - **Characters** (free time, favourite fish, Calm or Fishy mode) are saved on each phone.
 
 ## Files

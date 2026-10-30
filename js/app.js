@@ -324,7 +324,7 @@ function renderToday(){
 }
 
 function renderDays(n){
-  let h=`<div class="days">`;
+  let h=`<div class="seg" role="group" aria-label="Range"><a class="chip" href="#next-3-days" aria-pressed="${n===3}" style="text-decoration:none;color:inherit">Next 3 days</a><a class="chip" href="#week" aria-pressed="${n===7}" style="text-decoration:none;color:inherit">7 days</a></div><div class="days">`;
   for(let i=0;i<n;i++){
     const d0=dayStart(i).getTime(),first=mySpots()[0],sun=sunFor(d0+12*HOUR,first),m=moonAt(d0+20*HOUR);
     const ex=tides(first).ext.filter(e=>e.t>=d0&&e.t<d0+24*HOUR),w=wxAt(first,d0+9*HOUR);
@@ -497,23 +497,23 @@ function showWhy(spot,sp,t,opener){
 }
 
 /* ---------- render & wiring ---------- */
-const VIEWS=["today","next-3-days","week","spots","me"];
+const VIEWS=["today","next-3-days","week","spots","catches","me"];
 function currentView(){const v=(location.hash||"#today").slice(1);return VIEWS.includes(v)?v:"today"}
 function render(){
   document.documentElement.classList.toggle("fishy",fishy());
   const view=currentView();
-  document.querySelectorAll("nav.tabs a").forEach(a=>a.setAttribute("aria-current",a.dataset.v===view?"page":"false"));
+  document.querySelectorAll("nav.tabs a").forEach(a=>a.setAttribute("aria-current",a.dataset.v===(view==="next-3-days"?"week":view)?"page":"false"));
   $("#mark").textContent=fishy()?"Fishy Finds":"Fishy Friends";
-  $("#title").textContent=view==="today"?(selDay===0?T("Today","Today's quest"):fDayLong.format(dayStart(selDay))):view==="next-3-days"?"Next 3 days":view==="week"?"This week":view==="spots"?(detail?SPOTS[detail].name:"Spots"):T("Characters","Your crew");
+  $("#title").textContent=view==="today"?(selDay===0?T("Today","Today's quest"):fDayLong.format(dayStart(selDay))):view==="next-3-days"?"Next 3 days":view==="week"?"This week":view==="spots"?(detail?SPOTS[detail].name:"Spots"):view==="catches"?T("Catches","Fish cards"):T("Characters","Your crew");
   document.title=fishy()?"Fishy Finds · Fishy Friends":"Fishy Friends";
   renderWho();
   if(MAP){MAP.remove();MAP=null}
   const el=$("#view");
-  el.innerHTML=view==="today"?renderToday():view==="next-3-days"?renderDays(3):view==="week"?renderDays(7):view==="spots"?renderSpots():renderMe();
+  el.innerHTML=view==="today"?renderToday():view==="next-3-days"?renderDays(3):view==="week"?renderDays(7):view==="spots"?renderSpots():view==="catches"?renderCatches():renderMe();
   wire(el,view);
   $("#foot").innerHTML=`<p>Tide times are calculated from tide-gauge data (TICON-4 via <a href="https://neaps.js.org/" target="_blank" rel="noopener">Neaps</a>) and checked against the Bureau of Meteorology. Heights are approximate. Not for navigation.</p>
     <p>Weather, water temperature and place search from <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a>. Maps © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>. Seafood advice: <a href="https://www.health.nsw.gov.au/environment/factsheets/Pages/dioxins.aspx" target="_blank" rel="noopener">NSW Health</a>.</p>
-    <p>Bite scores are a guide built from local fishing advice, not a promise. Check NSW size and bag limits before keeping a fish.</p>`;
+    <p>Bite scores are a guide built from local fishing advice, not a promise. Size and bag limits from <a href="${window.RULES_SOURCE}" target="_blank" rel="noopener">NSW DPI</a>; always check the latest rules.</p>`;
 }
 function wire(el,view){
   el.querySelectorAll("[data-spot]").forEach(b=>b.onclick=()=>{selSpot=b.dataset.spot;ensureWeather([selSpot]);render()});
@@ -536,6 +536,7 @@ function wire(el,view){
   }
   if(view==="spots"&&detail)wireDetail(el,detail);
   if(view==="me")wireMe(el);
+  if(view==="catches")wireCatches(el);
 }
 function refreshKeep(){const y=window.scrollY;render();window.scrollTo(0,y)}
 function openDetail(k){detail=k;addingPin=null;if(location.hash!=="#spots")location.hash="#spots";else render();ensureWeather([k]);loadShared(k).then(refreshDetail).catch(()=>{});window.scrollTo(0,0)}
@@ -594,7 +595,7 @@ function wireMe(el){
 
 /* ---------- start ---------- */
 function ensureWeather(keys){const zones=[...new Set(keys.map(wxKey))];zones.forEach(z=>{if(!WX[z])loadWeather(z).then(()=>refreshKeep())})}
-window.addEventListener("hashchange",()=>{editing=null;if(currentView()!=="spots"){detail=null;addingPin=null}render();window.scrollTo(0,0)});
+window.addEventListener("hashchange",()=>{editing=null;if(currentView()!=="spots"){detail=null;addingPin=null}if(currentView()!=="catches"&&CATCH.mode!=="new"){CATCH.mode="feed";CATCH.openId=null}render();window.scrollTo(0,0)});
 render();
 ensureWeather([...mySpots(),...Object.keys(window.CURATED_SPOTS)]);
-setInterval(()=>{const d=dayKey(NOW);setClock();if(dayKey(NOW)!==d){for(const k in TIDES)delete TIDES[k]}if(!document.querySelector(".sheet-bg")&&!editing&&!addingPin&&document.activeElement.tagName!=="INPUT")refreshKeep()},5*60000);
+setInterval(()=>{const d=dayKey(NOW);setClock();if(dayKey(NOW)!==d){for(const k in TIDES)delete TIDES[k]}if(!document.querySelector(".sheet-bg")&&!editing&&!addingPin&&CATCH.mode!=="new"&&document.activeElement.tagName!=="INPUT")refreshKeep()},5*60000);

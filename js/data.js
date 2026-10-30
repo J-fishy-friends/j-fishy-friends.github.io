@@ -87,3 +87,44 @@ window.CURATED_SPOTS = {
     pros:["Bream hotspot (NSW fishing guide)","Quiet park"],
     cons:["West of the bridge: release only"],approx:true}
 };
+
+/* NSW saltwater rules (NSW DPI, checked 30 Oct 2026). min/max in cm; bag = daily bag limit per person. */
+window.RULES = {
+  bream:{min:25,bag:10,label:"Yellowfin or black bream",note:"Combined bag of 10 with tarwhine."},
+  flathead:{min:36,max:70,bag:5,label:"Dusky flathead",note:"Keep only between 36 and 70 cm. Big females over 70 cm must go back. Sand flathead: min 33 cm, bag 10."},
+  leatherjacket:{min:null,bag:20,label:"Leatherjackets",note:"No minimum size. Combined bag of 20."},
+  whiting:{min:27,bag:20,label:"Sand whiting",note:""},
+  tailor:{min:30,bag:10,label:"Tailor",note:"Sharp teeth: use pliers to unhook."},
+  luderick:{min:27,bag:10,label:"Luderick",note:""},
+  squid:{min:null,bag:20,label:"Squid and cuttlefish",note:"No minimum size. Combined bag of 20."},
+  snapper:{min:30,bag:10,label:"Snapper",note:""},
+  trevally:{min:30,bag:10,label:"Silver trevally",note:""},
+  mullet:{min:30,bag:20,label:"Sea mullet",note:""},
+  kingfish:{min:65,bag:5,label:"Yellowtail kingfish",note:"Most harbour kingfish are under 65 cm, so release them carefully."}
+};
+window.RULES_SOURCE = "https://www.dpi.nsw.gov.au/fishing/recreational/fishing-rules-and-regs/saltwater-bag-and-size-limits";
+
+/* Our own rarity, based on how often each fish is caught from land around Sydney. 0 common .. 3 legendary.
+   A fish at least "big" cm long moves up one level. */
+window.RARITY = {
+  bream:{base:0,big:35}, mullet:{base:0,big:45}, leatherjacket:{base:0,big:35}, trevally:{base:0,big:45},
+  flathead:{base:1,big:60}, whiting:{base:1,big:38}, luderick:{base:1,big:40}, squid:{base:1,big:30}, tailor:{base:1,big:50},
+  snapper:{base:2,big:50}, kingfish:{base:2,big:65}
+};
+window.RARITY_NAMES = {calm:["Common","Uncommon","Rare","Trophy"], fishy:["Shell","Pearl","Starfish","Legend"]};
+window.RARITY_COLORS = ["#9FB7BC","#14A3A1","#E0A21B","#E5533D"];
+
+/* Fun facts shown on catch cards. */
+window.FACTS = {
+  bream:"Bream can live for more than 20 years and are famously cautious. Light line helps.",
+  flathead:"Big dusky flathead are almost all females, which is why fish over 70 cm must be released.",
+  leatherjacket:"Leatherjackets have a spike on their head and skin like sandpaper.",
+  whiting:"Whiting dig in the sand for worms and yabbies with their pointy snouts.",
+  tailor:"Tailor hunt in packs and can bite through light line.",
+  luderick:"Luderick are one of the few fish that mostly eat weed.",
+  squid:"Squid can change colour in a blink and squirt ink to escape.",
+  snapper:"Older snapper grow a big bump on their forehead.",
+  trevally:"Silver trevally have rubbery lips for sucking food off the bottom.",
+  mullet:"Mullet often jump right out of the water. Nobody is quite sure why.",
+  kingfish:"Kingfish are the strongest fighters in the harbour and can grow over a metre long."
+};
