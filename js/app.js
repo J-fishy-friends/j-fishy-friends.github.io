@@ -306,6 +306,18 @@ function fishHTML(i,spot){
     +(others.length?`<section class="card"><div class="sub"><h2>${T("Also biting","Bonus fish!")}</h2><span class="small muted">${T("Suggested for you","Try these too")}</span></div><div class="fish">${others.map(row).join("")}</div></section>`:"");
 }
 
+/* The tide strip holds all 7 days side by side. Swiping to a day selects it; picking a day scrolls to it. */
+function wireTideScroll(el){
+  const sc=el.querySelector("#tideScroll");if(!sc)return;
+  const chip=el.querySelector("[data-day][aria-pressed=true]"),row=chip&&chip.parentElement;
+  const go=()=>{sc.scrollLeft=selDay*sc.clientWidth;
+    if(row){const r=row.getBoundingClientRect(),c=chip.getBoundingClientRect();row.scrollLeft+=c.left-r.left-(r.width-c.width)/2}};
+  go();requestAnimationFrame(go);
+  let timer=null;
+  sc.addEventListener("scroll",()=>{clearTimeout(timer);timer=setTimeout(()=>{
+    const i=Math.max(0,Math.min(6,Math.round(sc.scrollLeft/sc.clientWidth)));
+    if(i!==selDay){selDay=i;refreshKeep()}},140)},{passive:true});
+}
 function renderToday(){
   const list=mySpots();if(!selSpot||!list.includes(selSpot))selSpot=list[0];const sp=selSpot;
   const dayBtns=[0,1,2,3,4,5,6].map(i=>`<button class="chip" aria-pressed="${i===selDay}" data-day="${i}">${i===0?"Today":i===1?"Tomorrow":fDay.format(dayStart(i))}</button>`).join("");
@@ -316,7 +328,8 @@ function renderToday(){
     <div class="sub"><h2>${esc(SPOTS[sp].name)}</h2>${safetyBadge(sp)}</div>
     ${st?`<p class="small muted">${st.text}</p>`:""}
     <div class="seg" role="group" aria-label="Day">${dayBtns}</div>
-    <div>${tideSVG(selDay,sp)}</div>
+    <div class="tide-scroll" id="tideScroll" aria-label="Tide charts for the next 7 days. Swipe sideways to change day.">${[0,1,2,3,4,5,6].map(i=>`<div class="tide-day" data-tday="${i}">${tideSVG(i,sp)}</div>`).join("")}</div>
+    <p class="small muted swipe-hint">${T("Swipe the chart sideways for other days","Swipe the waves to see more days")} ›</p>
     <div class="legend"><span><i class="sw" style="background:var(--good);opacity:.5"></i>${bandWord(80)}</span><span><i class="sw" style="background:var(--fair);opacity:.5"></i>${bandWord(60)}</span><span><i class="sw" style="background:var(--poor);opacity:.5"></i>${bandWord(40)}</span><span>Faded = outside free time</span></div>
     ${condHTML(selDay,sp)}
     <div class="row-btns"><button class="btn ghost small" data-detail="${sp}">${T("Map and cast points","Treasure map")}</button></div>
@@ -519,7 +532,8 @@ function render(){
 }
 function wire(el,view){
   el.querySelectorAll("[data-spot]").forEach(b=>b.onclick=()=>{selSpot=b.dataset.spot;ensureWeather([selSpot]);render()});
-  el.querySelectorAll("[data-day]").forEach(b=>b.onclick=()=>{selDay=+b.dataset.day;render()});
+  el.querySelectorAll("[data-day]").forEach(b=>b.onclick=()=>{selDay=+b.dataset.day;refreshKeep()});
+  wireTideScroll(el);
   el.querySelectorAll("[data-open]").forEach(b=>{const go=()=>{selDay=+b.dataset.open;location.hash="#today";window.scrollTo(0,0)};
     b.onclick=e=>{if(e.target.closest("[data-why]"))return;go()};b.onkeydown=e=>{if((e.key==="Enter"||e.key===" ")&&!e.target.closest("[data-why]")){e.preventDefault();go()}}});
   el.querySelectorAll("[data-why]").forEach(b=>b.onclick=e=>{e.stopPropagation();const[sp,f,t]=b.dataset.why.split("|");showWhy(sp,f,+t,b)});

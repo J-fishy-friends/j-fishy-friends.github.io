@@ -266,3 +266,8 @@ footer a{color:var(--muted)}
 .crew-btns{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;flex-shrink:0}
 .bdg.secret{border:1.5px dashed var(--line);opacity:.8}
 .bdg.secret .medal{background:transparent}
+/* swipeable tide strip */
+.tide-scroll{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;overscroll-behavior-x:contain;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.tide-scroll::-webkit-scrollbar{display:none}
+.tide-day{flex:0 0 100%;min-width:0;scroll-snap-align:start;scroll-snap-stop:always}
+.swipe-hint{margin:4px 0 0;text-align:right}
